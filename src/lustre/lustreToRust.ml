@@ -86,6 +86,8 @@ let fmt_prefix blah name fmt typ = Format.fprintf fmt "\
   unused_variables, unused_parens
 )]
 
+#![no_std]
+
 use helpers::* ;
 " blah name typ typ
 
@@ -99,7 +101,7 @@ let fmt_prefix_oracle = fmt_prefix "Oracle"
 let fmt_main fmt () = Format.fprintf fmt "\
 /// Entry point.
 fn main() {
- // clap_and_run()
+  // clap_and_run()
 }
 "
 
@@ -108,6 +110,59 @@ parsing. *)
 let fmt_helpers fmt systems = Format.fprintf fmt "\
 /// Types and structures for systems.
 pub mod helpers {
+ /* use std::io::{ Stdin, stdin } ;
+  use std::process::exit ;
+
+  /// Prints usage.
+  pub fn help() {
+    println!(\"\") ;
+    println!(\"\\
+Options:
+  -h, --help
+    prints this message@.  \
+  @[<v>%a@]
+Usage:
+  Inputs (outputs) are read (printed) as comma-separated values on a single
+  line.
+  The read-eval-print loop runs forever, write \\\"exit\\\" or \\\"quit\\\"
+  to exit it cleanly.
+Default system: \\\"%s\\\".\\
+    \") ;
+    println!(\"\")
+  }
+
+  /// Prints usage, an error, and exits with status `2`.
+  pub fn error<T: ::std::fmt::Display>(e: T) {
+    help() ;
+    println!(\"Error: {}\", e) ;
+    println!(\"\") ;
+    exit(2)
+  }
+
+  /// Handles CLA.
+  pub fn clap_and_run() {
+    use std::env::args ;
+    let mut args = args() ;
+    // Skipping first argument (name of binary).
+    match args.next() {
+      Some(_) => (),
+      None => unreachable!(),
+    } ;
+    if let Some(arg) = args.next() {
+      match & arg as & str {
+        \"-h\" | \"--help\" => {
+          help() ;
+          exit(0)
+        },\
+@.        @[<v>%a@]
+        arg => error(
+          format!(\"unexpected argument \\\"{}\\\".\", arg)
+        ),
+      }
+    } ;
+    // If no argument given, run top system.
+    super::%s::run()
+  }*/
 
   /// Alias for `i64`.
   pub type Int = i64 ;
@@ -115,6 +170,53 @@ pub mod helpers {
   pub type Real = f64 ;
   /// Alias for `bool`.
   pub type Bool = bool ;
+
+  /// Stores an `Stdin` and a buffer to read lines.
+   /* pub struct InputReader {
+    /// Standard input.
+    stdin: Stdin,
+    /// String buffer.
+    buff: String,
+  }
+  impl InputReader {
+    /// Creates an input reader.
+    pub fn mk() -> Self {
+      InputReader {
+        stdin: stdin(),
+        buff: String::with_capacity(100),
+      }
+    }
+    /// Reads comma separated inputs from standard input.
+    pub fn read_inputs(& mut self) -> Result<Vec<String>, String> {
+      self.buff.clear() ;
+      match self.stdin.read_line(& mut self.buff) {
+        Ok(_) => (),
+        Err(e) => return Err(
+          format!(\"could not read line from stdin: {}\", e)
+        ),
+      } ;
+      let chars = self.buff.trim_left().chars() ;
+      let mut buff = String::new() ;
+      let mut vec = vec![] ;
+      for c in chars {
+        match c {
+          ' ' | '\\t' => (),
+          ',' | '\\n' => {
+            vec.push(buff.clone()) ;
+            buff.clear()
+          },
+          _ => buff.push(c),
+        }
+      } ;
+      if vec.len() > 1 {
+        match vec[0].trim() {
+          \"exit\" | \"quit\" => exit(0),
+          _ => ()
+        }
+      } ;
+      Ok(vec)
+    }
+  } */
 
   /// Trait all systems must implement.
   pub trait Sys: Sized {
@@ -127,25 +229,110 @@ pub mod helpers {
     /// Number of inputs expected.
     fn arity() -> usize ;
     /// Parses a vector of inputs.
-    fn input_of(array: Self::Array) -> Input ;
+    fn input_of(array: Self::Array) -> Self::Input ;
     /// Initial state of the system.
     fn init(input: Self::Input) -> Self ;
     /// Computes the next step.
     fn next(&mut self, input: Self::Input) ;
     /// Reads inputs from standard input, computes initial state, prints output.
+    /* fn read_init(reader: & mut InputReader) -> Result<Self, String> {
+      match Self::input_of( try!(reader.read_inputs()) ) {
+        Ok(inputs) => {
+          let init = try!( Self::init(inputs) ) ;
+          println!(\"{}\", init.output_str()) ;
+          Ok(init)
+        },
+        Err(s) => Err(s),
+      }
+    } */
+
     fn read_init(array: Self::Array) -> Self{
       let inputs = Self::input_of(array);
       Self::init(inputs)
     }
+
     /// Reads inputs from standard input, computes next step, prints output.
+    /* fn read_next(self, reader: & mut InputReader) -> Result<Self, String> {
+      match Self::input_of( try!(reader.read_inputs()) ) {
+        Ok(inputs) => {
+          let next = try!( self.next(inputs) ) ;
+          println!(\"{}\", next.output_str()) ;
+          Ok(next)
+        },
+        Err(s) => Err(s),
+      }
+    } */
     fn read_next(&mut self, array: Self::Array){
       let inputs = Self::input_of(array);
       self.next(inputs);
     }
+
     /// Output of the system.
     fn output(& self) -> Self::Output ;
+    /// String representation of the output.
+    // fn output_str(& self) -> String ;
+    /// Runs a never-ending, read-eval-print loop on the system.
+    /* fn run() -> ! {
+      let mut reader = InputReader::mk() ;
+      let mut state = match Self::read_init(& mut reader) {
+        Ok(init) => init,
+        Err(e) => {
+          println!(\"(Error: {})\", e) ;
+          exit(2)
+        }
+      } ;
+      loop {
+        match state.read_next(& mut reader) {
+          Ok(next) => state = next,
+          Err(e) => {
+            println!(\"(Error: {})\", e) ;
+            exit(2)
+          }
+        }
+      }
+    } */
   }
 }
+
+/// Parsing functions.
+/* pub mod parse {
+  use helpers::{ Int, Real, Bool } ;
+  use std::fmt::Display ;
+  use std::str::FromStr ;
+  /// Generic parser to factor error handling out.
+  fn generic<
+    Out, Error: Display, F: Fn(& str) -> Result<Out, Error>
+  >(s: & str, f: F, typ3: & 'static str) -> Result<Out, String> {
+    match f(s) {
+      Ok(res) => Ok(res),
+      Err(e) => Err(
+        format!(\"could not parse \\\"{}\\\" as {}: {}\", s, typ3, e)
+      ),
+    }
+  }
+  /// Parses a [`Bool`](../type.Bool.html).
+  pub fn %s(s: & str) -> Result<Bool, String> {
+    generic(
+      s,
+      |s| match s {
+        \"true\" | \"on\" => Ok(true),
+        \"false\" | \"off\" => Ok(false),
+        _ => Err(
+          format!(\"legal values: true, on, false, off\")
+        ),
+      },
+      \"a bool\"
+    )
+  }
+  /// Parses an [`Int`](../type.Int.html).
+  pub fn %s(s: & str) -> Result<Int, String> {
+    generic(s, |s| Int::from_str(s), \"an int\")
+  }
+  /// Parses a [`Real`](../type.Real.html).
+  pub fn %s(s: & str) -> Result<Real, String> {
+    generic(s, |s| Real::from_str(s), \"a real\")
+  }
+} */
 "
 (pp_print_list
   ( fun fmt { N.name ; N.inputs ; N.outputs } ->
@@ -924,7 +1111,7 @@ let node_to_rust oracle_info is_top fmt (
   let input_cpt = ref 0 in
   Format.fprintf fmt "  \
       @[<v>\
-        fn input_of(array: Self::Array) -> Self::Input {@   \
+        fn input_of(vec: Vec<String>) -> Result<Self::Input, String> {@   \
           @[<v>\
             match vec.len() {@   \
               @[<v>\
@@ -1113,7 +1300,7 @@ let node_to_rust oracle_info is_top fmt (
   ) ;
 
   Format.fprintf fmt "  \
-      fn next(mut self, input: Self::Input) {@.    \
+      fn next(mut self, input: Self::Input) -> Result<Self, String> {@.    \
         @[<v>\
           // |===| Retrieving inputs.@ \
           %a@ @ \
@@ -1900,7 +2087,6 @@ let oracle_to_rust target find_sub top =
    indent-tabs-mode: nil
    End: 
 *)
-
 
 
 
