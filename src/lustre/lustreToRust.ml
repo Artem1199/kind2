@@ -224,12 +224,10 @@ Default system: \\\"%s\\\".\\
     type Input ;
     /// Type of outputs.
     type Output ;
-    /// Type of array input.
-    type Array ;
     /// Number of inputs expected.
-    fn arity() -> usize ;
+    /*fn arity() -> usize ;
     /// Parses a vector of inputs.
-    fn input_of(array: Self::Array) -> Self::Input ;
+    fn input_of(Vec<String>) -> Result<Self::Input, String> ;*/
     /// Initial state of the system.
     fn init(input: Self::Input) -> Self ;
     /// Computes the next step.
@@ -245,10 +243,8 @@ Default system: \\\"%s\\\".\\
         Err(s) => Err(s),
       }
     } */
-
-    fn read_init(array: Self::Array) -> Self{
-      let inputs = Self::input_of(array);
-      Self::init(inputs)
+    fn read_init(input: Self::Input) -> Self{
+      Self::init(input)
     }
 
     /// Reads inputs from standard input, computes next step, prints output.
@@ -262,16 +258,15 @@ Default system: \\\"%s\\\".\\
         Err(s) => Err(s),
       }
     } */
-    fn read_next(&mut self, array: Self::Array){
-      let inputs = Self::input_of(array);
-      self.next(inputs);
+    fn read_next(&mut self, input: Self::Input){
+      self.next(input);
     }
 
     /// Output of the system.
     fn output(& self) -> Self::Output ;
-    /// String representation of the output.
+    // String representation of the output.
     // fn output_str(& self) -> String ;
-    /// Runs a never-ending, read-eval-print loop on the system.
+    // Runs a never-ending, read-eval-print loop on the system.
     /* fn run() -> ! {
       let mut reader = InputReader::mk() ;
       let mut state = match Self::read_init(& mut reader) {
@@ -294,7 +289,7 @@ Default system: \\\"%s\\\".\\
   }
 }
 
-/// Parsing functions.
+// Parsing functions.
 /* pub mod parse {
   use helpers::{ Int, Real, Bool } ;
   use std::fmt::Display ;
@@ -1024,7 +1019,8 @@ let node_to_rust oracle_info is_top fmt (
   ) ;
 
   (* Struct header. *)
-  Format.fprintf fmt "pub struct %s {" typ ;
+  Format.fprintf fmt "#[repr(C)]
+  pub struct %s {" typ ;
 
   (* Fields. *)
   inputs |> List.iter (fun (_, svar) ->
@@ -1105,11 +1101,11 @@ let node_to_rust oracle_info is_top fmt (
 
   (* Arity. *)
   List.length inputs
-  |> Format.fprintf fmt "  fn arity() -> usize { %d }@." ;
+  |> Format.fprintf fmt "/*  fn arity() -> usize { %d }@.*/" ;
 
   (* Input parsing. *)
   let input_cpt = ref 0 in
-  Format.fprintf fmt "  \
+  Format.fprintf fmt "/*  \
       @[<v>\
         fn input_of(vec: Vec<String>) -> Result<Self::Input, String> {@   \
           @[<v>\
@@ -1117,7 +1113,7 @@ let node_to_rust oracle_info is_top fmt (
               @[<v>\
                 n if n == Self::arity() => {@   \
                   @[<v>\
-                    Ok( (@   @[<v>%a@],@ ) )\
+                     (@   @[<v>%a@],@ ) \
                   @]@ \
                 },@ \
                 n => Err(@   \
@@ -1133,7 +1129,7 @@ let node_to_rust oracle_info is_top fmt (
           @]@ \
         }\
       @]@.@.\
-    "
+    */ "
     ( pp_print_list (fun fmt (_, svar) ->
         Format.fprintf fmt "try!( parse::%s(& vec[%d]) )" (
           SVar.type_of_state_var svar
@@ -1153,7 +1149,7 @@ let node_to_rust oracle_info is_top fmt (
   ) ;
 
   Format.fprintf fmt "  \
-      fn init(input: Self::Input) -> Result<Self, String> {@.    \
+      fn init(input: Self::Input) -> Self {@.    \
         @[<v>\
           // |===| Retrieving inputs.@ \
           %a@ @ \
@@ -1163,14 +1159,14 @@ let node_to_rust oracle_info is_top fmt (
           %a@ @ \
           %a\
           // |===| Returning initial state.@ \
-          Ok( %s {@   \
+           %s {@   \
             @[<v>\
               // |===| Inputs.@ %a@ @ \
               // |===| Outputs.@ %a@ @ \
               // |===| Locals.@ %a@ @ \
               // |===| Calls.@ %a\
             @]@ \
-          } )\
+          } \
         @]@.  \
       }@.@.\
     "
@@ -1196,7 +1192,7 @@ let node_to_rust oracle_info is_top fmt (
         ) ->
           Format.fprintf fmt
             "\
-              let %s = try!( %s::init( (@   @[<v>%a,@]@ ) ) ) ;@ \
+              let %s = %s::init( (@   @[<v>%a,@]@ ) ) ;@ \
               let (@   @[<v>%a,@]@ ) = %s.output() ;@ \
             "
             (id_of_call cnt call)
@@ -1300,7 +1296,7 @@ let node_to_rust oracle_info is_top fmt (
   ) ;
 
   Format.fprintf fmt "  \
-      fn next(mut self, input: Self::Input) -> Result<Self, String> {@.    \
+      fn next(&mut self, input: Self::Input) {@.    \
         @[<v>\
           // |===| Retrieving inputs.@ \
           %a@ @ \
@@ -1314,8 +1310,8 @@ let node_to_rust oracle_info is_top fmt (
           // |===| Inputs.@ %a@ @ \
           // |===| Outputs.@ %a@ @ \
           // |===| Locals.@ %a@ @ \
-          // |===| Calls.@ %a@ @ \
-          // |===| Return new state.@ Ok( self )\
+          // |===| Calls.@ /*%a*/ @ @ \
+          // |===| Return new state.@ /*Ok( self )*/\
         @]@.  \
       }@.@.\
     "
@@ -1342,8 +1338,8 @@ let node_to_rust oracle_info is_top fmt (
         ) ->
           Format.fprintf fmt
             "\
-              let %s = try!( self.%s.next( (@   @[<v>%a,@]@ ) ) ) ;@ \
-              let (@   @[<v>%a,@]@ ) = %s.output() ;\
+              /*let %s = */ self.%s.next( (@   @[<v>%a,@]@ ) ) ;@ \
+              let (@   @[<v>%a,@]@ ) = self.%s.output() ;\
             "
             (id_of_call cnt call)
             (id_of_call cnt call)
@@ -1440,7 +1436,7 @@ let node_to_rust oracle_info is_top fmt (
   ) ;
 
   (* Output to string. *)
-  Format.fprintf fmt "  \
+  Format.fprintf fmt "/*  \
     @[<v>\
       fn output_str(& self) -> String {@   \
         @[<v>\
@@ -1448,7 +1444,7 @@ let node_to_rust oracle_info is_top fmt (
             @[<v>\"%a\",@ %a@]@ \
           )\
         @]@ \
-      }\
+      }*/\
     @]@.\
   " (
     pp_print_list (fun fmt _ -> Format.fprintf fmt "{}") ", \\@ "
